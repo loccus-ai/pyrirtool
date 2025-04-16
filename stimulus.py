@@ -61,7 +61,7 @@ class stimulus:
             scaling = pi*numSamples*(w1/w2-1)/(2*(w2-w1)*log(w1/w2))*(w2-w1)/pi; # Holters2009, Eq.10
 
             # fade-in window. Fade out removed because causes ringing - cropping at zero cross instead
-            taperStart = signal.tukey(numSamples,0)
+            taperStart = signal.windows.tukey(numSamples,0)
             taperWindow = np.ones(shape = (numSamples,))
             taperWindow[0:int(numSamples/2)] = taperStart[0:int(numSamples/2)]
             sinsweep = sinsweep*taperWindow
@@ -96,15 +96,19 @@ class stimulus:
             for idx in range(0,numChans):
 
                 #currentChannel = systemOutput[0:self.repetitions*self.Lp,idx]
-                currentChannel = systemOutput[:,idx]
-                # RIRs[:,idx] = fftconvolve(self.invfilter,currentChannel);
+                # orig: problems with the length of the signal
+                # currentChannel = systemOutput[:,idx]
+                # javi: pad with zeros to match signal length
+                currentChannel = np.pad(systemOutput[:,idx], (0, self.Lp - systemOutput[:,idx].shape[0]), 'constant')
+                
+                RIRs[:,idx] = fftconvolve(self.invfilter,currentChannel)
 
-                # Average over the repetitions - DEPRECATED. Should not be done.
-                sig_reshaped = currentChannel.reshape((self.repetitions,self.Lp))
-                sig_avg = np.mean(sig_reshaped,axis = 0)
+                # # Average over the repetitions - DEPRECATED. Should not be done.
+                # sig_reshaped = currentChannel.reshape((self.repetitions,self.Lp))
+                # sig_avg = np.mean(sig_reshaped,axis = 0)
 
-                # Deconvolution
-                RIRs[:,idx] = fftconvolve(self.invfilter,sig_avg);
+                # # Deconvolution
+                # RIRs[:,idx] = fftconvolve(self.invfilter,sig_avg);
 
             return RIRs
 
