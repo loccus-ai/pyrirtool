@@ -1,79 +1,26 @@
-# %%
 import os
-import sounddevice as sd
+import sys
 import numpy as np
+import librosa
+import soundfile as sf
+import sounddevice as sd
 from matplotlib import pyplot as plt
 
 # modules from this software
 import stimulus as stim
 import _parseargs as parse
 import utils as utils
-import sys
-import soundfile as sf
-import librosa
 
-# %%
-# --- Parse command line arguments and check defaults
-recording='../recordings/REcbdb0b438839daebf0f87bb84af9d989_sigtest_fs16000_ss3_es1/sigtest_fs16000_ss3_es1_nokia_recording.wav'
-original='../recordings/REcbdb0b438839daebf0f87bb84af9d989_sigtest_fs16000_ss3_es1/sigtest_fs16000_ss3_es1.wav'
-sys.argv = 'measure.py --fs 16000 -ss 3 -es 1'.split()
-flag_defaultsInitialized = parse._checkdefaults()
-args = parse._parse()
-parse._defaults(args)
-# ------------------------
 
-# %%
-# Create a test signal object, and generate the excitation
-testStimulus = stim.stimulus('sinesweep', args.fs);
-testStimulus.generate(args.fs, args.duration, args.amplitude,args.reps,args.startsilence, args.endsilence, args.sweeprange)
+# 
+def replace_extension(filename, new_extension):
+    # Split the filename into name and extension
+    name, ext = os.path.splitext(filename)
+    # Concatenate the name with the new extension
+    new_filename = name + new_extension
+    return new_filename
 
-# %%
-x, fs = librosa.load(recording, sr=args.fs)
-
-# %%
-x = np.expand_dims(x, 1)
-x.shape
-
-# %%
-# Deconvolve
-impulse_response = testStimulus.deconvolve(x)
-
-# %%
-maxval = np.max(impulse_response)
-minval = np.min(impulse_response)
-taxis = np.arange(0,impulse_response.shape[0]/fs,1/fs)
-
-# Plot all on a single figure
-# plt.figure(figsize = (10,6))
-# plt.plot(taxis,RIR)
-# plt.ylim((minval+0.05*minval,maxval+0.05*maxval))
-
-# Plot them as subplots
-numplots = impulse_response.shape[1]
-#height = numplots*3
-#fig = plt.figure(figsize = (10,height))
-for idx in range(numplots):
-    fig = plt.figure(figsize = (9,3))
-    plt.plot(impulse_response[:,idx])
-    plt.ylim((minval+0.05*minval,maxval+0.05*maxval))
-    plt.title('RIR Microphone '+ str(idx + 1))
-    #ax = fig.add_subplot(numplots,1,idx+1)
-    #plt.plot(taxis,RIR[:,idx])
-
-# %%
-sf.write('RIR.wav', impulse_response, fs)
-
-# %%
-x_original, fs = librosa.load('../sample_1min.wav', sr=args.fs)
-
-# %%
-y_simulated = np.convolve(impulse_response[:,0], x_original)
-sf.write('simulated.wav', y_simulated, fs)
-
-# %% [markdown]
-# # Reverberation time T60
-
-# %%
+# 
 def compute_tdecay(impulse_response_ori, sample_rate, DBdecay, plot=False, title=''):
     
     max_position = np.argmax(impulse_response_ori)
@@ -113,17 +60,16 @@ def compute_tdecay(impulse_response_ori, sample_rate, DBdecay, plot=False, title
     TTdecay = t_Tdecay / sample_rate
     print(f"Reverberation time (T{DBdecay}) is {TTdecay} seconds")
 
-    TTdecay_sample = int(TTdecay * fs)
+    TTdecay_sample = int(TTdecay * sample_rate)
     RIRtrimmed = impulse_response_ori.copy()
     RIRtrimmed = RIRtrimmed[max_position-TTdecay_sample:max_position+TTdecay_sample,:]
     RIRtrimmed0 = impulse_response_ori.copy()
     RIRtrimmed0[0:max_position-TTdecay_sample,:] = 0
     RIRtrimmed0[max_position+TTdecay_sample:,:] = 0
 
-
     if plot:
         fig = plt.figure(figsize = (9,3))
-        t = np.arange(0, impulse_response.shape[0]) / fs
+        t = np.arange(0, impulse_response.shape[0]) / sample_rate
         plt.plot(t, decay_curve)
         plt.grid()
         plt.xlabel('Time (s)')
@@ -133,71 +79,77 @@ def compute_tdecay(impulse_response_ori, sample_rate, DBdecay, plot=False, title
         plt.title(title)
         plt.show()
 
-
     return TTdecay, decay_curve, RIRtrimmed, RIRtrimmed0
 
-# %%
-T60, decay_curve, RIRtrimmed, RIRtrimmed0 = compute_tdecay(impulse_response, fs, 60, plot=True, title='Decay curve RIR T60')
 
-# %%
+def process(recorded_audio, command, plot, Treverb=[30, 60]):
+    # 
+    # recorded_audio='../recordings/REcbdb0b438839daebf0f87bb84af9d989_sigtest_fs16000_ss3_es1/sigtest_fs16000_ss3_es1_nokia_recording.wav'
+    # original_audio='../recordings/REcbdb0b438839daebf0f87bb84af9d989_sigtest_fs16000_ss3_es1/sigtest_fs16000_ss3_es1.wav'
+    # sys.argv = 'measure.py --fs 16000 -ss 3 -es 1'.split()
 
-sf.write('RIR_trimmed.wav', RIRtrimmed, fs)
-y_simulated_trimmed = np.convolve(RIRtrimmed[:,0], x_original)
-sf.write('simulated_trimmed.wav', y_simulated_trimmed, fs)
+    # 
+    sys.argv = command.split()
+    flag_defaultsInitialized = parse._checkdefaults()
+    args = parse._parse()
+    parse._defaults(args)
+    # Create a test signal object, and generate the excitation
+    testStimulus = stim.stimulus('sinesweep', args.fs)
+    testStimulus.generate(args.fs, args.duration, args.amplitude,args.reps,args.startsilence, args.endsilence, args.sweeprange)
 
-sf.write('RIR_trimmed0.wav', RIRtrimmed0, fs)
-y_simulated_trimmed0 = np.convolve(RIRtrimmed0[:,0], x_original)
-sf.write('simulated_trimmed0.wav', y_simulated_trimmed0, fs)
+    # 
+    # Load recorded signal
+    x, fs = librosa.load(recorded_audio, sr=args.fs)
+    x = np.expand_dims(x, 1)
 
+    # 
+    # Deconvolve
+    impulse_response = testStimulus.deconvolve(x)
 
-# %%
-T30, decay_curve_T30, RIRtrimmed_T30, RIRtrimmed0_T30 = compute_tdecay(impulse_response, fs, 30, plot=True, title='Decay curve RIR T30')
+    # 
+    maxval = np.max(impulse_response)
+    minval = np.min(impulse_response)
+    taxis = np.arange(0,impulse_response.shape[0]/fs,1/fs)
 
-# %%
-sf.write('RIR_trimmed_T30.wav', RIRtrimmed_T30, fs)
-y_simulated_trimmed_T30 = np.convolve(RIRtrimmed_T30[:,0], x_original)
-sf.write('simulated_trimmed_T30.wav', y_simulated_trimmed_T30, fs)
+    if plot:
+        # Plot all on a single figure
+        plt.figure(figsize = (10,6))
+        plt.plot(taxis,impulse_response)
+        plt.ylim((minval+0.05*minval,maxval+0.05*maxval))
+        plt.title(f'RIR {recorded_audio}')
 
-sf.write('RIR_trimmed0_T30.wav', RIRtrimmed0_T30, fs)
-y_simulated_trimmed0_T30 = np.convolve(RIRtrimmed0_T30[:,0], x_original)
-sf.write('simulated_trimmed0_T30.wav', y_simulated_trimmed0_T30, fs)
+    # 
+    output_RIR = replace_extension(recorded_audio, '_RIR.wav')
+    sf.write(output_RIR, impulse_response, fs)
+    
+    for T in Treverb:
+        T60, decay_curve_T, RIRtrimmed_T, RIRtrimmed0_T = compute_tdecay(impulse_response, fs, T, plot=plot, title=f'Decay curve RIR T{T}')
+        
+        output_RIR_trimmed_T = replace_extension(recorded_audio, f'_RIR_trimmed_T{T}.wav')
+        output_RIR_trimmed0_T = replace_extension(recorded_audio, f'_RIR_trimmed0_T{T}.wav')
 
+        sf.write(output_RIR_trimmed_T, RIRtrimmed_T, fs)
+        sf.write(output_RIR_trimmed0_T, RIRtrimmed0_T, fs)
 
 
 import argparse
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Process audio files.")
-    parser.add_argument('input_directory', type=str, help='Path to the input directory')
-    parser.add_argument('original_audio', type=str, help='Path to the original audio file')
-    parser.add_argument('recorded_audio', type=str, help='Path to the recorded audio file')
-    parser.add_argument('command', type=str, help='Command to execute')
+    parser.add_argument('--recorded_audio', type=str, help='Path to the recorded audio file. Example: "../recordings/REcbdb0b438839daebf0f87bb84af9d989_sigtest_fs16000_ss3_es1/sigtest_fs16000_ss3_es1_nokia_recording.wav')
+    parser.add_argument('--command', type=str, help='Command to execute. Example: "measure.py --fs 16000 -ss 3 -es 1"')
+    parser.add_argument('--plot', action='store_true', help='Flag to enable plotting. Default: False')
+    parser.add_argument('--Treverb', type=int, nargs='+', default=[30, 60], help='List of integers for reverberation times. Default: [30, 60]')
 
     return parser.parse_args()
-
-def process(input_directory, original_audio, recorded_audio, command):
-    print(f"Input Directory: {input_directory}")
-    print(f"Original Audio: {original_audio}")
-    print(f"Recorded Audio: {recorded_audio}")
-    print(f"Command: {command}")
-
-    # Implement your processing logic here
-    if command == "play":
-        print("Playing audio files...")
-        # Add logic to play the audio files
-    elif command == "compare":
-        print("Comparing audio files...")
-        # Add logic to compare the audio files
-    else:
-        print(f"Unknown command: {command}")
 
 def main():
     args = parse_arguments()
     process(
-        input_directory=args.input_directory,
-        original_audio=args.original_audio,
         recorded_audio=args.recorded_audio,
-        command=args.command
+        command=args.command,
+        plot=args.plot,
+        Treverb=args.Treverb
     )
 
 if __name__ == "__main__":

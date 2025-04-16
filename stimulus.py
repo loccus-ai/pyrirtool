@@ -90,7 +90,8 @@ class stimulus:
         if self.type == 'sinesweep':
 
             numChans = systemOutput.shape[1]
-            tmplen = self.invfilter.shape[0] + self.Lp-1;
+            systemOutputLen = systemOutput.shape[0]
+            tmplen = self.invfilter.shape[0] + self.Lp-1
             RIRs = np.zeros(shape = (tmplen,numChans))
 
             for idx in range(0,numChans):
@@ -99,8 +100,11 @@ class stimulus:
                 # orig: problems with the length of the signal
                 # currentChannel = systemOutput[:,idx]
                 # javi: pad with zeros to match signal length
-                currentChannel = np.pad(systemOutput[:,idx], (0, self.Lp - systemOutput[:,idx].shape[0]), 'constant')
-                
+                if systemOutputLen < self.Lp:
+                    currentChannel = np.pad(systemOutput[:,idx], (0, self.Lp - systemOutput[:,idx].shape[0]), 'constant')
+                else:
+                    currentChannel = systemOutput[:self.Lp,idx]
+                    
                 RIRs[:,idx] = fftconvolve(self.invfilter,currentChannel)
 
                 # # Average over the repetitions - DEPRECATED. Should not be done.
