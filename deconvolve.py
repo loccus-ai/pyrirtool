@@ -4,6 +4,7 @@ import numpy as np
 import librosa
 import soundfile as sf
 import sounddevice as sd
+import json
 from matplotlib import pyplot as plt
 
 # modules from this software
@@ -82,24 +83,26 @@ def compute_tdecay(impulse_response_ori, sample_rate, DBdecay, plot=False, title
     return TTdecay, decay_curve, RIRtrimmed, RIRtrimmed0
 
 
-def process(recorded_audio, command, plot, Treverb=[30, 60]):
+def process(recorded_audio, sweep_conf_json, plot, Treverb=[30, 60]):
     # 
     # recorded_audio='../recordings/REcbdb0b438839daebf0f87bb84af9d989_sigtest_fs16000_ss3_es1/sigtest_fs16000_ss3_es1_nokia_recording.wav'
     # original_audio='../recordings/REcbdb0b438839daebf0f87bb84af9d989_sigtest_fs16000_ss3_es1/sigtest_fs16000_ss3_es1.wav'
     # sys.argv = 'measure.py --fs 16000 -ss 3 -es 1'.split()
-
+    with open(sweep_conf_json, 'r') as f:
+        sweep_params = json.load(f)
     # 
-    sys.argv = command.split()
-    flag_defaultsInitialized = parse._checkdefaults()
-    args = parse._parse()
-    parse._defaults(args)
+    # sys.argv = command.split()
+    # flag_defaultsInitialized = parse._checkdefaults()
+    # args = parse._parse()
+    # parse._defaults(args)
+
     # Create a test signal object, and generate the excitation
-    testStimulus = stim.stimulus('sinesweep', args.fs)
-    testStimulus.generate(args.fs, args.duration, args.amplitude,args.reps,args.startsilence, args.endsilence, args.sweeprange)
+    testStimulus = stim.stimulus('sinesweep', sweep_params['fs'])
+    testStimulus.generate(sweep_params['fs'], sweep_params['duration'], sweep_params['amplitude'],sweep_params['reps'],sweep_params['startsilence'], sweep_params['endsilence'], sweep_params['sweeprange'])
 
     # 
     # Load recorded signal
-    x, fs = librosa.load(recorded_audio, sr=args.fs)
+    x, fs = librosa.load(recorded_audio, sr=sweep_params['fs'])
     x = np.expand_dims(x, 1)
 
     # 
@@ -137,7 +140,7 @@ import argparse
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Process audio files.")
     parser.add_argument('--recorded_audio', type=str, help='Path to the recorded audio file. Example: "../recordings/REcbdb0b438839daebf0f87bb84af9d989_sigtest_fs16000_ss3_es1/sigtest_fs16000_ss3_es1_nokia_recording.wav')
-    parser.add_argument('--command', type=str, help='Command to execute. Example: "measure.py --fs 16000 -ss 3 -es 1"')
+    parser.add_argument('--sweep_json', type=str, help='JSON file with sweep parameters. Example: "../recordings/REcbdb0b438839daebf0f87bb84af9d989_sigtest_fs16000_ss3_es1/sigtest_fs16000_ss3_es1.json"')
     parser.add_argument('--plot', action='store_true', help='Flag to enable plotting. Default: False')
     parser.add_argument('--Treverb', type=int, nargs='+', default=[30, 60], help='List of integers for reverberation times. Default: [30, 60]')
 
@@ -147,7 +150,7 @@ def main():
     args = parse_arguments()
     process(
         recorded_audio=args.recorded_audio,
-        command=args.command,
+        sweep_conf_json=args.sweep_json,        
         plot=args.plot,
         Treverb=args.Treverb
     )

@@ -53,7 +53,7 @@ if flag_defaultsInitialized == True:
     else:
 
         # Create a test signal object, and generate the excitation
-        testStimulus = stim.stimulus('sinesweep', args.fs);
+        testStimulus = stim.stimulus('sinesweep', args.fs)
         testStimulus.generate(args.fs, args.duration, args.amplitude,args.reps,args.startsilence, args.endsilence, args.sweeprange)
 
         # Record
@@ -63,7 +63,7 @@ if flag_defaultsInitialized == True:
         RIR = testStimulus.deconvolve(recorded)
 
         # Truncate
-        lenRIR = 1.2;
+        lenRIR = 1.2
         startId = testStimulus.signal.shape[0] - args.endsilence*args.fs -1
         endId = startId + int(lenRIR*args.fs)
         # save some more samples before linear part to check for nonlinearities

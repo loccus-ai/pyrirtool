@@ -17,7 +17,7 @@ def process(audio_file, ir_data, sample_rate, suffix: str, output_directory: str
     audio_data, sample_rate = librosa.load(audio_file, sr=sample_rate)
     print(f"Loaded audio file: {audio_file}, Sample rate: {sample_rate}")
 
-    output_file = replace_extension(audio_file, suffix)    
+    output_file = replace_extension(audio_file, "_"+suffix)    
     if output_directory:
         output_file = os.path.join(output_directory, output_file)
         os.makedirs(os.path.dirname(output_file), exist_ok=True)

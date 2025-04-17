@@ -1,0 +1,13 @@
+{
+    "fs": 44100,
+    "duration": 10,
+    "reps": 1,
+    "amplitude": 0.2,
+    "startsilence": 5,
+    "sweeprange": [
+        0,
+        0
+    ],
+    "endsilence": 10,
+    "output": "sigtest_fs44100_ss5_es10.wav"
+}

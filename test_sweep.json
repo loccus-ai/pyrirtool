@@ -1,0 +1,13 @@
+{
+    "fs": 44100,
+    "duration": 10,
+    "reps": 1,
+    "amplitude": 0.2,
+    "startsilence": 3,
+    "sweeprange": [
+        0,
+        0
+    ],
+    "endsilence": 6,
+    "output": "test_sweep.wav"
+}
