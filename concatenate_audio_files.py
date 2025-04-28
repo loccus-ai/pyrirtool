@@ -64,10 +64,10 @@ def generate_long_audios(input_files, sweep_audio, output_dir, sweep_probability
         current_audio += sweep_audio
         file_info.append({'filename': 'sweep.wav', 'start': end_sweep_start, 'end': end_sweep_end, 'is_sweep': True})
 
-        output_file = os.path.join(output_dir, f'long_audio_{file_count}.wav')
+        output_file = os.path.join(output_dir, f'long_audio_{file_count:04}.wav')
         current_audio.export(output_file, format="wav")
 
-        with jsonlines.open(os.path.join(output_dir, f'long_audio_{file_count}_info.jsonl'), 'w') as info_file:
+        with jsonlines.open(os.path.join(output_dir, f'long_audio_{file_count:04}_info.jsonl'), 'w') as info_file:
             for entry in file_info:
                 info_file.write(entry)
 
