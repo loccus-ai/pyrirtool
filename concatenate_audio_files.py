@@ -70,7 +70,7 @@ def maybe_insert_sweep(sweep_audio, probability):
         return AudioSegment.silent(duration=0), False
 
 
-def append_with_sync_tone(current_audio, segment_to_add, sync_tone, file_info, segment_info):
+def append_with_sync_tone(current_audio, segment_to_add, sync_tone, file_info, segment_info, sync_tone_filename):
     """
     Appends a segment to the current audio, preceded by a sync tone, and updates file_info.
 
@@ -80,6 +80,7 @@ def append_with_sync_tone(current_audio, segment_to_add, sync_tone, file_info, s
         sync_tone (AudioSegment): The synchronization tone audio segment.
         file_info (list): List of file info dictionaries to update.
         segment_info (dict): Info dict for the segment being added (filename, is_sweep).
+        sync_tone_filename (str): The actual filename of the sync tone audio file.
 
     Returns:
         AudioSegment: The updated concatenated audio.
@@ -88,7 +89,7 @@ def append_with_sync_tone(current_audio, segment_to_add, sync_tone, file_info, s
     sync_start = current_audio.duration_seconds
     current_audio += sync_tone
     sync_end = current_audio.duration_seconds
-    file_info.append({'filename': 'sync_tone', 'start': sync_start, 'end': sync_end, 'is_sweep': False, 'is_sync_tone': True})
+    file_info.append({'filename': sync_tone_filename, 'start': sync_start, 'end': sync_end, 'is_sweep': False, 'is_sync_tone': True})
 
     # Add the actual segment
     segment_start = current_audio.duration_seconds
@@ -104,7 +105,7 @@ def append_with_sync_tone(current_audio, segment_to_add, sync_tone, file_info, s
 
     return current_audio
 
-def generate_long_audios(input_files, sweep_audio, sync_tone, output_dir, sweep_probability, root_dir, output_length_seconds):
+def generate_long_audios(input_files, sweep_audio, sync_tone, output_dir, sweep_probability, root_dir, output_length_seconds, sweep_filename, sync_tone_filename):
     """
     Generates audio files of specified length by concatenating multiple input audio files and inserting sweep audio segments.
     A synchronization tone is inserted before each segment (including sweeps) for later reconstruction.
@@ -117,6 +118,8 @@ def generate_long_audios(input_files, sweep_audio, sync_tone, output_dir, sweep_
         sweep_probability (float): Probability of inserting the sweep audio segment (0 to 1).
         root_dir (str): Root directory containing the audio files.
         output_length_seconds (int): Length of the output audio files in seconds.
+        sweep_filename (str): The actual filename of the sweep audio file.
+        sync_tone_filename (str): The actual filename of the sync tone audio file.
     """
     file_count = 1
 
@@ -131,7 +134,8 @@ def generate_long_audios(input_files, sweep_audio, sync_tone, output_dir, sweep_
         # Add initial sweep with sync tone
         current_audio = append_with_sync_tone(
             current_audio, sweep_audio, sync_tone, file_info,
-            {'filename': 'sweep.wav', 'is_sweep': True}
+            {'filename': sweep_filename, 'is_sweep': True},
+            sync_tone_filename
         )
 
         random.shuffle(input_files)  # Shuffle input files for randomness
@@ -144,20 +148,23 @@ def generate_long_audios(input_files, sweep_audio, sync_tone, output_dir, sweep_
             # Add audio file with sync tone
             current_audio = append_with_sync_tone(
                 current_audio, audio_segment, sync_tone, file_info,
-                {'filename': file, 'is_sweep': False}
+                {'filename': file, 'is_sweep': False},
+                sync_tone_filename
             )
 
             # Add sweep if randomly selected
             if was_sweep_inserted:
                 current_audio = append_with_sync_tone(
                     current_audio, sweep_segment, sync_tone, file_info,
-                    {'filename': 'sweep.wav', 'is_sweep': True}
+                    {'filename': sweep_filename, 'is_sweep': True},
+                    sync_tone_filename
                 )
 
         # Add the sweep audio at the end with sync tone
         current_audio = append_with_sync_tone(
             current_audio, sweep_audio, sync_tone, file_info,
-            {'filename': 'sweep.wav', 'is_sweep': True}
+            {'filename': sweep_filename, 'is_sweep': True},
+            sync_tone_filename
         )
 
         output_file = os.path.join(output_dir, f'long_audio_{file_count:04}.wav')
@@ -195,7 +202,7 @@ def main():
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir)
 
-    generate_long_audios(input_files, sweep_audio, sync_tone, args.output_dir, args.sweep_probability, args.root_dir, args.output_length)
+    generate_long_audios(input_files, sweep_audio, sync_tone, args.output_dir, args.sweep_probability, args.root_dir, args.output_length, args.sweep_file, args.sync_tone_file)
 
 if __name__ == "__main__":
     main()
