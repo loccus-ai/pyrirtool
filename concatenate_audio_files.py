@@ -1,8 +1,56 @@
 import os
 import random
 import argparse
+import subprocess
+import tempfile
 from pydub import AudioSegment
 import jsonlines
+
+# Target audio format: 16kHz, 16-bit, mono
+TARGET_FRAME_RATE = 16000
+TARGET_SAMPLE_WIDTH = 2  # 16 bits = 2 bytes
+TARGET_CHANNELS = 1
+
+
+def normalize_audio(audio):
+    """
+    Converts an audio segment to linear PCM 16kHz, 16 bits/sample, mono.
+
+    Args:
+        audio (AudioSegment): The audio segment to normalize.
+
+    Returns:
+        AudioSegment: The normalized audio segment.
+    """
+    return audio.set_frame_rate(TARGET_FRAME_RATE).set_sample_width(TARGET_SAMPLE_WIDTH).set_channels(TARGET_CHANNELS)
+
+
+def load_audio_normalized(filepath):
+    """
+    Loads an audio file and normalizes it to 16kHz, 16-bit, mono PCM.
+    Handles floating-point WAV files by using ffmpeg for conversion.
+
+    Args:
+        filepath (str): Path to the audio file.
+
+    Returns:
+        AudioSegment: The normalized audio segment.
+    """
+    # Use ffmpeg to convert to standard PCM format first
+    # This handles float WAV and other non-standard formats
+    with tempfile.NamedTemporaryFile(suffix='.wav', delete=True) as tmp:
+        cmd = [
+            'ffmpeg', '-y', '-i', filepath,
+            '-ar', str(TARGET_FRAME_RATE),
+            '-ac', str(TARGET_CHANNELS),
+            '-sample_fmt', 's16',  # signed 16-bit
+            '-f', 'wav',
+            tmp.name
+        ]
+        subprocess.run(cmd, capture_output=True, check=True)
+        audio = AudioSegment.from_file(tmp.name, format='wav')
+
+    return audio
 
 
 def maybe_insert_sweep(sweep_audio, probability):
@@ -73,7 +121,11 @@ def generate_long_audios(input_files, sweep_audio, sync_tone, output_dir, sweep_
     file_count = 1
 
     while input_files:
-        current_audio = AudioSegment.silent(duration=0)  # Start with empty audio
+        # Start with empty audio matching the target format (16kHz, 16-bit, mono)
+        current_audio = AudioSegment.silent(
+            duration=0,
+            frame_rate=TARGET_FRAME_RATE
+        ).set_channels(TARGET_CHANNELS).set_sample_width(TARGET_SAMPLE_WIDTH)
         file_info = []
 
         # Add initial sweep with sync tone
@@ -86,7 +138,7 @@ def generate_long_audios(input_files, sweep_audio, sync_tone, output_dir, sweep_
 
         while input_files and current_audio.duration_seconds < output_length_seconds:
             file = os.path.join(root_dir, input_files.pop(0))
-            audio_segment = AudioSegment.from_file(file)
+            audio_segment = load_audio_normalized(file)
             sweep_segment, was_sweep_inserted = maybe_insert_sweep(sweep_audio, sweep_probability)
 
             # Add audio file with sync tone
@@ -137,8 +189,8 @@ def main():
     with open(args.input_list, 'r') as f:
         input_files = [line.strip() for line in f]
 
-    sweep_audio = AudioSegment.from_file(args.sweep_file)
-    sync_tone = AudioSegment.from_file(args.sync_tone_file)
+    sweep_audio = load_audio_normalized(args.sweep_file)
+    sync_tone = load_audio_normalized(args.sync_tone_file)
 
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir)
